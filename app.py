@@ -14,6 +14,13 @@ url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3l
 csv_url = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
 try:
     df = pd.read_csv(csv_url)
+    # Lê a aba de Unidades para preencher o formulário automaticamente
+url_unidades = url_planilha.replace('sheet=dados', 'sheet=Unidades')
+try:
+    df_unidades = pd.read_csv(url_unidades)
+    lista_unidades = df_unidades["Nome_Unidade"].unique().tolist()
+except:
+    lista_unidades = ["Unidade A", "Unidade B"] # Caso a aba não exista, ele usa esses nomes
 except:
     st.error("Erro ao ler a planilha. Verifique se o nome da aba é 'dados' e se ela está compartilhada como 'Qualquer pessoa com o link pode editar'.")
     st.stop()
@@ -25,11 +32,13 @@ if escolha == "Abrir OS":
     st.header("Abertura de Ordem de Serviço")
     
     with st.form("form_os"):
-        unidade = st.selectbox("Unidade", ["Unidade A", "Unidade B", "Unidade C"])
+        unidade = st.selectbox("Unidade", lista_unidades)
         responsavel = st.text_input("Seu Nome")
         tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil"])
         descricao = st.text_area("Descrição do Problema")
-        foto = st.text_input("Link da Foto")
+        foto_arquivo = st.camera_input("Tire uma foto da OS")
+# Aqui, para simplificar sem Google Cloud, vamos apenas avisar se a foto foi tirada
+foto = "Foto Capturada" if foto_arquivo else "Sem Foto"
         
         submetido = st.form_submit_button("Abrir Ordem de Serviço")
         
@@ -79,12 +88,24 @@ elif escolha == "Ver/Encerrar OS":
         st.warning("Nenhuma OS encontrada.")
 
 elif escolha == "Dashboard":
-    st.header("Resumo de Atividades")
+    st.header("📊 Painel de Controle de Manutenção")
+    
     if not df.empty:
-        col1, col2 = st.columns(2)
-        with col1:
+        # Indicadores principais (Cards)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total de OS", len(df))
+        col2.metric("Em Aberto", len(df[df["Status"] == "Aberta"]))
+        col3.metric("Finalizadas", len(df[df["Status"] == "Finalizada"]))
+
+        st.divider()
+
+        # Gráficos principais
+        c1, c2 = st.columns(2)
+        with c1:
             st.subheader("OS por Unidade")
             st.bar_chart(df["Unidade"].value_counts())
-        with col2:
-            st.subheader("Status das OS")
-            st.write(df["Status"].value_counts())
+        with c2:
+            st.subheader("Tipos de Manutenção")
+            st.write(df["Tipo"].value_counts())
+    else:
+        st.info("Aguardando dados para gerar o dashboard.")
