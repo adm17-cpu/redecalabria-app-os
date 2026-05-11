@@ -11,8 +11,8 @@ url = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Yt
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Função para ler dados
-df = conn.read(spreadsheet=url, worksheet="dados")
-
+csv_url = url.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
+df = pd.read_csv(csv_url)
 menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Menu", menu)
 
