@@ -8,7 +8,7 @@ st.set_page_config(page_title="Gestão de OS", layout="wide")
 
 # URLs (SUBSTITUA A URL_SCRIPT PELA QUE VOCÊ GEROU NO PASSO 1)
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
-url_script = "https://script.google.com/a/macros/calabria.com.br/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
+url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
 
 # LER DADOS (Método CSV - Seguro e Gratuito)
 csv_url = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
