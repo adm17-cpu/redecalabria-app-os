@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="Gestão de OS", layout="wide")
 
 # Conexão com o Google Sheets
-url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA"
+url = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Função para ler dados
