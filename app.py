@@ -58,7 +58,21 @@ if escolha == "Abrir OS":
                 st.error("Por favor, preencha todos os campos obrigatórios.")
             else:
                 agora = get_brasilia_time()
-                foto_status = "Foto enviada" if foto_arquivo else "Sem foto"
+                
+                # --- NOVA LÓGICA DE FOTO ---
+                if foto_arquivo:
+                    # Converte a foto em texto para salvar na planilha
+                    bytes_data = foto_arquivo.getvalue()
+                    foto_base64 = base64.b64encode(bytes_data).decode()
+                    foto_status = f"data:image/png;base64,{foto_base64}"
+                else:
+                    foto_status = "Sem foto"
+                # ---------------------------
+
+                nova_linha = [int(len(df) + 1), agora, unidade, responsavel, tipo, descricao, foto_status, "Aberta"]
+                payload = {"action": "add", "row": nova_linha}
+                requests.post(url_script, json=payload)
+                st.success("OS Registrada!")
                 
                 # Prepara os dados para o Google Apps Script
                 nova_linha = [
@@ -90,7 +104,23 @@ elif escolha == "Ver/Encerrar OS":
     
     if not df_abertas.empty:
         st.dataframe(df_abertas, use_container_width=True)
+        if not df_abertas.empty:
+        st.dataframe(df_abertas, use_container_width=True)
         
+        # --- NOVO: VISUALIZADOR DE FOTO ---
+        st.subheader("Visualizar Detalhes/Foto")
+        id_ver = st.selectbox("Selecione o ID da OS para ver a foto", df_abertas["ID"].tolist())
+        
+        dados_os = df_abertas[df_abertas["ID"] == id_ver].iloc[0]
+        
+        if "data:image" in str(dados_os['Foto_URL']):
+            st.image(dados_os['Foto_URL'], caption=f"Foto da OS {id_ver}", width=400)
+        else:
+            st.info("Esta OS não possui foto anexada.")
+        # ----------------------------------
+        
+        st.divider()
+        # ... (segue o restante do código de encerramento)
         st.divider()
         st.subheader("Dar Baixa em Ordem")
         
