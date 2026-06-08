@@ -43,7 +43,7 @@ if escolha == "Abrir OS":
     with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", lista_unidades)
         responsavel = st.text_input("Seu Nome")
-        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"])
+        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria", "Climatização", "TI","Vidraçaria","Serralheria","Móveis", "Outros"])
         descricao = st.text_area("Descrição do problema")
         foto_arquivo = st.camera_input("Tire uma foto (Opcional)")
         
