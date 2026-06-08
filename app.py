@@ -7,10 +7,7 @@ from datetime import datetime
 from io import BytesIO
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(
-    page_title="Gestão de OS - Rede Calábria", 
-    page_icon="https://www.calabria.com.br/wp-content/uploads/2021/05/logo-calabria.png", 
-    layout="wide"
+st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 # Função para capturar hora oficial de Brasília
 def get_brasilia_time():
