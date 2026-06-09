@@ -30,8 +30,8 @@ except Exception as e:
     st.error(f"Erro ao conectar com a planilha: {e}")
     st.stop()
 
-# 4. BARRA LATERAL
-st.sidebar.image("https://www.calabria.com.br/wp-content/uploads/2021/05/logo-calabria.png", width=150)
+# 4. BARRA LATERAL / MENU
+st.sidebar.title("Rede Calábria")
 menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
@@ -43,7 +43,7 @@ if escolha == "Abrir OS":
     with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", lista_unidades)
         responsavel = st.text_input("Seu Nome")
-        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria", "Climatização", "TI","Vidraçaria","Serralheria","Móveis", "Outros"])
+        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
         foto_arquivo = st.camera_input("Tire uma foto (Opcional)")
         
@@ -76,63 +76,33 @@ if escolha == "Abrir OS":
 
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
+    
+    # Filtra apenas as ordens que estão abertas
     df_abertas = df[df["Status"] == "Aberta"]
     
     if not df_abertas.empty:
-        st.dataframe(df_abertas[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
+        # --- NOVO: FILTRO POR UNIDADE ---
+        # Criamos uma lista de opções contendo "Todas" + as unidades da planilha
+        opcoes_filtro = ["Todas"] + lista_unidades
+        unidade_selecionada = st.selectbox("Filtrar por Unidade", opcoes_filtro)
         
-        st.divider()
-        st.subheader("🔍 Visualizar Detalhes e Foto")
+        # Aplica o filtro de unidade no conjunto de dados se não for "Todas"
+        if unidade_selecionada != "Todas":
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_selecionada]
+        else:
+            df_exibicao = df_abertas
+        # --------------------------------
         
-        id_selecionado = st.selectbox("Selecione o ID da OS para detalhar", df_abertas["ID"].tolist())
-        detalhe = df_abertas[df_abertas["ID"] == id_selecionado].iloc[0]
-        
-        col_txt, col_img = st.columns([1, 1])
-        with col_txt:
-            st.write(f"**Responsável:** {detalhe['Responsavel']}")
-            st.write(f"**Descrição:** {detalhe['Descricao']}")
-        with col_img:
-            if "data:image" in str(detalhe['Foto_URL']):
-                st.image(detalhe['Foto_URL'], caption=f"Foto da OS {id_selecionado}")
-            else:
-                st.info("Esta OS não possui foto.")
-
-        st.divider()
-        st.subheader("🔒 Encerrar esta OS")
-        tecnico = st.text_input("Técnico Responsável pelo fechamento")
-        
-        if st.button("Confirmar Encerramento"):
-            if tecnico:
-                agora_fim = get_brasilia_time()
-                payload = {
-                    "action": "update",
-                    "id": int(id_selecionado),
-                    "status": "Finalizada",
-                    "tecnico": tecnico,
-                    "data_fim": agora_fim
-                }
-                requests.post(url_script, json=payload)
-                st.success(f"OS {id_selecionado} encerrada!")
-                st.rerun()
-            else:
-                st.warning("Informe o nome do técnico.")
-    else:
-        st.info("Nenhuma OS aberta.")
-
-elif escolha == "Dashboard":
-    st.header("📊 Indicadores")
-    if not df.empty:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total", len(df))
-        c2.metric("Abertas", len(df[df["Status"] == "Aberta"]))
-        c3.metric("Finalizadas", len(df[df["Status"] == "Finalizada"]))
-        
-        st.divider()
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.write("### Por Unidade")
-            st.bar_chart(df["Unidade"].value_counts())
-        with col_b:
-            st.write("### Por Tipo")
-            col_tipo = "Tipo" if "Tipo" in df.columns else df.columns[4]
-            st.bar_chart(df[col_tipo].value_counts())
+        # Verifica se o filtro resultou em alguma OS encontrada
+        if not df_exibicao.empty:
+            # Exibe a tabela filtrada ocultando a coluna da imagem
+            st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
+            
+            st.divider()
+            st.subheader("🔍 Visualizar Detalhes e Foto")
+            
+            # O selectbox de detalhes agora mostra apenas os IDs que passaram pelo filtro de unidade
+            id_selecionado = st.selectbox("Selecione o ID da OS para detalhar", df_exibicao["ID"].tolist())
+            detalhe = df_exibicao[df_exibicao["ID"] == id_selecionado].iloc[0]
+            
+            col_txt
