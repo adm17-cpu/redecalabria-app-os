@@ -50,7 +50,14 @@ if escolha == "Abrir OS":
         responsavel = st.text_input("Seu Nome")
         tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
-        foto_arquivo = st.camera_input("Tire uma foto (Opcional)")
+        
+        st.write("---")
+        st.subheader("📸 Anexar Foto")
+        # Mantemos a Câmera
+        foto_camera = st.camera_input("Tirar foto agora")
+        # Adicionamos o Upload de Arquivo
+        foto_upload = st.file_uploader("Ou escolha uma foto da galeria", type=["jpg", "jpeg", "png"])
+        st.write("---")
         
         submetido = st.form_submit_button("Enviar Ordem de Serviço")
         
@@ -62,8 +69,16 @@ if escolha == "Abrir OS":
             else:
                 agora = get_brasilia_time()
                 
-                if foto_arquivo:
-                    bytes_data = foto_arquivo.getvalue()
+                # Lógica para verificar qual foto usar (Upload tem prioridade sobre a câmera se ambos existirem)
+                arquivo_final = None
+                if foto_upload is not None:
+                    arquivo_final = foto_upload
+                elif foto_camera is not None:
+                    arquivo_final = foto_camera
+                
+                # Processamento da Foto para Base64
+                if arquivo_final:
+                    bytes_data = arquivo_final.getvalue()
                     foto_base64 = base64.b64encode(bytes_data).decode()
                     foto_string = f"data:image/png;base64,{foto_base64}"
                 else:
@@ -78,7 +93,7 @@ if escolha == "Abrir OS":
                         st.success(f"OS Nº {len(df)+1} registrada com sucesso!")
                         st.balloons()
                     else:
-                        st.error("Erro ao salvar. Verifique o Apps Script.")
+                        st.error("Erro ao salvar no servidor.")
 
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
@@ -136,7 +151,7 @@ elif escolha == "Ver/Encerrar OS":
         else:
             st.info("Nenhuma OS aberta no sistema.")
     else:
-        st.info("Aguardando carregamento de dados válidos da planilha.")
+        st.info("Aguardando carregamento de dados.")
 
 elif escolha == "Dashboard":
     st.header("📊 Indicadores")
