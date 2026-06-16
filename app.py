@@ -45,7 +45,6 @@ if erro_conexao:
 if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     
-    # AJUSTE 1: Adiciona uma opção em branco no início da lista de unidades
     opcoes_unidades_abertura = ["Selecione uma Unidade..."] + lista_unidades
     
     with st.form("form_os", clear_on_submit=True):
@@ -63,10 +62,9 @@ if escolha == "Abrir OS":
         submetido = st.form_submit_button("Enviar Ordem de Serviço")
         
         if submetido:
-            # Validação para garantir que o usuário escolheu uma unidade válida
             if unidade == "Selecione uma Unidade...":
                 st.error("Por favor, selecione uma Unidade válida antes de enviar!")
-            elif not responsavel or not Hyd_desc := descricao:
+            elif not responsavel or not descricao:
                 st.error("Preencha Nome e Descrição!")
             elif erro_conexao:
                 st.error("Sistema desconectado da planilha.")
@@ -130,12 +128,16 @@ elif escolha == "Ver/Encerrar OS":
                 else:
                     st.info("Esta OS não possui foto.")
 
-                # AJUSTE 2: SEÇÃO PARA EDIÇÃO DA OS PELO USUÁRIO
+                # SEÇÃO PARA EDIÇÃO DA OS PELO USUÁRIO
                 st.divider()
                 with st.expander("✏️ Editar dados desta OS (Apenas para Ordens Abertas)"):
                     st.warning("Você pode alterar as informações iniciais abaixo caso tenham sido digitadas incorretamente.")
                     novo_responsavel = st.text_input("Alterar Nome do Responsável", value=str(detalhe['Responsavel']))
-                    novo_tipo = st.selectbox("Alterar Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"], index=["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"].index(detalhe['Tipo']) if detalhe['Tipo'] in ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"] else 0)
+                    
+                    lista_tipos = ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"]
+                    idx_tipo = lista_tipos.index(detalhe['Tipo']) if detalhe['Tipo'] in lista_tipos else 0
+                    novo_tipo = st.selectbox("Alterar Tipo de Manutenção", lista_tipos, index=idx_tipo)
+                    
                     nova_descricao = st.text_area("Alterar Descrição do problema", value=str(detalhe['Descricao']))
                     
                     if st.button("Salvar Alterações da OS"):
