@@ -22,7 +22,7 @@ csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
 
 df = pd.DataFrame()
-lista_unidades = ["Unidade Padrão"]
+lista_unidades = []
 erro_conexao = None
 
 try:
@@ -45,38 +45,40 @@ if erro_conexao:
 if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     
+    # AJUSTE 1: Adiciona uma opção em branco no início da lista de unidades
+    opcoes_unidades_abertura = ["Selecione uma Unidade..."] + lista_unidades
+    
     with st.form("form_os", clear_on_submit=True):
-        unidade = st.selectbox("Selecione a Unidade", lista_unidades)
+        unidade = st.selectbox("Selecione a Unidade", opcoes_unidades_abertura)
         responsavel = st.text_input("Seu Nome")
-        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria", "Móveis", "TI", "Climatização", "Serralheria", "Outros"])
+        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
         
         st.write("---")
         st.subheader("📸 Anexar Foto")
-        # Mantemos a Câmera
         foto_camera = st.camera_input("Tirar foto agora")
-        # Adicionamos o Upload de Arquivo
         foto_upload = st.file_uploader("Ou escolha uma foto da galeria", type=["jpg", "jpeg", "png"])
         st.write("---")
         
         submetido = st.form_submit_button("Enviar Ordem de Serviço")
         
         if submetido:
-            if not responsavel or not descricao:
+            # Validação para garantir que o usuário escolheu uma unidade válida
+            if unidade == "Selecione uma Unidade...":
+                st.error("Por favor, selecione uma Unidade válida antes de enviar!")
+            elif not responsavel or not Hyd_desc := descricao:
                 st.error("Preencha Nome e Descrição!")
             elif erro_conexao:
                 st.error("Sistema desconectado da planilha.")
             else:
                 agora = get_brasilia_time()
                 
-                # Lógica para verificar qual foto usar (Upload tem prioridade sobre a câmera se ambos existirem)
                 arquivo_final = None
                 if foto_upload is not None:
                     arquivo_final = foto_upload
                 elif foto_camera is not None:
                     arquivo_final = foto_camera
                 
-                # Processamento da Foto para Base64
                 if arquivo_final:
                     bytes_data = arquivo_final.getvalue()
                     foto_base64 = base64.b64encode(bytes_data).decode()
@@ -103,7 +105,7 @@ elif escolha == "Ver/Encerrar OS":
         
         if not df_abertas.empty:
             opcoes_filtro = ["Todas"] + lista_unidades
-            unidade_selecionada = st.selectbox("Filtrar por Unidade", opcoes_filtro)
+            unidade_selecionada = st.selectbox("Filtrar tabela por Unidade", opcoes_filtro)
             
             if unidade_selecionada != "Todas":
                 df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_selecionada]
@@ -116,16 +118,44 @@ elif escolha == "Ver/Encerrar OS":
                 st.divider()
                 st.subheader("🔍 Visualizar Detalhes e Foto")
                 
-                id_selecionado = st.selectbox("Selecione o ID da OS para detalhar", df_exibicao["ID"].tolist())
+                id_selecionado = st.selectbox("Selecione o ID da OS para detalhar ou realizar ações", df_exibicao["ID"].tolist())
                 detalhe = df_exibicao[df_exibicao["ID"] == id_selecionado].iloc[0]
                 
-                st.markdown(f"**Responsável:** {detalhe['Responsavel']}")
-                st.markdown(f"**Descrição:** {detalhe['Descricao']}")
+                st.markdown(f"**Responsável Atual:** {detalhe['Responsavel']}")
+                st.markdown(f"**Tipo de Manutenção:** {detalhe['Tipo']}")
+                st.markdown(f"**Descrição Atual:** {detalhe['Descricao']}")
                 
                 if "data:image" in str(detalhe['Foto_URL']):
                     st.image(detalhe['Foto_URL'], caption=f"Foto da OS {id_selecionado}", width=500)
                 else:
                     st.info("Esta OS não possui foto.")
+
+                # AJUSTE 2: SEÇÃO PARA EDIÇÃO DA OS PELO USUÁRIO
+                st.divider()
+                with st.expander("✏️ Editar dados desta OS (Apenas para Ordens Abertas)"):
+                    st.warning("Você pode alterar as informações iniciais abaixo caso tenham sido digitadas incorretamente.")
+                    novo_responsavel = st.text_input("Alterar Nome do Responsável", value=str(detalhe['Responsavel']))
+                    novo_tipo = st.selectbox("Alterar Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"], index=["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"].index(detalhe['Tipo']) if detalhe['Tipo'] in ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"] else 0)
+                    nova_descricao = st.text_area("Alterar Descrição do problema", value=str(detalhe['Descricao']))
+                    
+                    if st.button("Salvar Alterações da OS"):
+                        if not novo_responsavel or not nova_descricao:
+                            st.error("Os campos Responsável e Descrição não podem ficar vazios!")
+                        else:
+                            payload_edit = {
+                                "action": "edit",
+                                "id": int(id_selecionado),
+                                "responsavel": novo_responsavel,
+                                "tipo": novo_tipo,
+                                "descricao": nova_descricao
+                            }
+                            with st.spinner("Atualizando dados da OS..."):
+                                res_edit = requests.post(url_script, json=payload_edit)
+                                if res_edit.status_code == 200:
+                                    st.success("Ordem de Serviço atualizada com sucesso!")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao atualizar os dados no servidor.")
 
                 st.divider()
                 st.subheader("🔒 Encerrar esta OS")
