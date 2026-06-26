@@ -8,12 +8,11 @@ from datetime import datetime
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
-# Função para capturar hora oficial de Brasília
 def get_brasilia_time():
     fuso = pytz.timezone('America/Sao_Paulo')
     return datetime.now(fuso).strftime("%d/%m/%Y %H:%M:%S")
 
-# 2. DEFINIÇÃO DE URLs
+# 2. CONFIGURAÇÃO DE URLs (LEMBRE-SE DE CHECAR SE SUA URL DO SCRIPT ESTÁ CORRETA)
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
 url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
 
@@ -32,7 +31,7 @@ try:
 except Exception as e:
     erro_conexao = str(e)
 
-# 4. BARRA LATERAL / MENU
+# 4. MENU LATERAL
 st.sidebar.title("Rede Calábria")
 menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Navegação", menu)
@@ -40,17 +39,15 @@ escolha = st.sidebar.selectbox("Navegação", menu)
 if erro_conexao:
     st.error(f"⚠️ Erro ao carregar dados da Planilha: {erro_conexao}")
 
-# 5. LÓGICA DO APP
-
+# 5. LÓGICA DO APLICATIVO
 if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
-    
     opcoes_unidades_abertura = ["Selecione uma Unidade..."] + lista_unidades
     
     with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades_abertura)
         responsavel = st.text_input("Seu Nome")
-        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Climatização", "Alvenaria", "TI","Móveis", "Serralheria", "Outros"])
+        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
         
         st.write("---")
@@ -70,12 +67,7 @@ if escolha == "Abrir OS":
                 st.error("Sistema desconectado da planilha.")
             else:
                 agora = get_brasilia_time()
-                
-                arquivo_final = None
-                if foto_upload is not None:
-                    arquivo_final = foto_upload
-                elif foto_camera is not None:
-                    arquivo_final = foto_camera
+                arquivo_final = foto_upload if foto_upload is not None else foto_camera
                 
                 if arquivo_final:
                     bytes_data = arquivo_final.getvalue()
@@ -99,23 +91,20 @@ elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     
     if not df.empty:
+        # Filtra apenas o que está Aberto baseado na sua coluna 'Status'
         df_abertas = df[df["Status"] == "Aberta"]
         
         if not df_abertas.empty:
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_selecionada = st.selectbox("Filtrar tabela por Unidade", opcoes_filtro)
             
-            if unidade_selecionada != "Todas":
-                df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_selecionada]
-            else:
-                df_exibicao = df_abertas
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_selecionada] if unidade_selecionada != "Todas" else df_abertas
             
             if not df_exibicao.empty:
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
                 
                 st.divider()
                 st.subheader("🔍 Visualizar Detalhes e Foto")
-                
                 id_selecionado = st.selectbox("Selecione o ID da OS para detalhar ou realizar ações", df_exibicao["ID"].tolist())
                 detalhe = df_exibicao[df_exibicao["ID"] == id_selecionado].iloc[0]
                 
@@ -128,37 +117,28 @@ elif escolha == "Ver/Encerrar OS":
                 else:
                     st.info("Esta OS não possui foto.")
 
-                # SEÇÃO PARA EDIÇÃO DA OS PELO USUÁRIO
+                # SEÇÃO DE EDIÇÃO DA OS
                 st.divider()
-                with st.expander("✏️ Editar dados desta OS (Apenas para Ordens Abertas)"):
-                    st.warning("Você pode alterar as informações iniciais abaixo caso tenham sido digitadas incorretamente.")
+                with st.expander("✏️ Editar dados desta OS"):
                     novo_responsavel = st.text_input("Alterar Nome do Responsável", value=str(detalhe['Responsavel']))
-                    
                     lista_tipos = ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"]
                     idx_tipo = lista_tipos.index(detalhe['Tipo']) if detalhe['Tipo'] in lista_tipos else 0
                     novo_tipo = st.selectbox("Alterar Tipo de Manutenção", lista_tipos, index=idx_tipo)
-                    
                     nova_descricao = st.text_area("Alterar Descrição do problema", value=str(detalhe['Descricao']))
                     
                     if st.button("Salvar Alterações da OS"):
                         if not novo_responsavel or not nova_descricao:
-                            st.error("Os campos Responsável e Descrição não podem ficar vazios!")
+                            st.error("Os campos não podem ficar vazios!")
                         else:
-                            payload_edit = {
-                                "action": "edit",
-                                "id": int(id_selecionado),
-                                "responsavel": novo_responsavel,
-                                "tipo": novo_tipo,
-                                "descricao": nova_descricao
-                            }
-                            with st.spinner("Atualizando dados da OS..."):
-                                res_edit = requests.post(url_script, json=payload_edit)
-                                if res_edit.status_code == 200:
-                                    st.success("Ordem de Serviço atualizada com sucesso!")
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao atualizar os dados no servidor.")
+                            payload_edit = {"action": "edit", "id": int(id_selecionado), "responsavel": novo_responsavel, "tipo": novo_tipo, "descricao": nova_descricao}
+                            res_edit = requests.post(url_script, json=payload_edit)
+                            if res_edit.status_code == 200:
+                                st.success("Ordem de Serviço atualizada com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("Erro ao atualizar os dados.")
 
+                # SEÇÃO DE ENCERRAMENTO DA OS (CORRIGIDA)
                 st.divider()
                 st.subheader("🔒 Encerrar esta OS")
                 tecnico = st.text_input("Técnico Responsável pelo fechamento")
@@ -166,24 +146,28 @@ elif escolha == "Ver/Encerrar OS":
                 if st.button("Confirmar Encerramento"):
                     if tecnico:
                         agora_fim = get_brasilia_time()
+                        
                         payload = {
-                            "action": "update",
-                            "id": int(id_selecionado),
-                            "status": "Finalizada",
-                            "tecnico": tecnico,
+                            "action": "update", 
+                            "id": int(id_selecionado), 
+                            "status": "Finalizada", 
+                            "tecnico": tecnico, 
                             "data_fim": agora_fim
                         }
-                        requests.post(url_script, json=payload)
-                        st.success(f"OS {id_selecionado} encerrada!")
-                        st.rerun()
+                        
+                        with st.spinner("Encerrando Ordem de Serviço no sistema..."):
+                            res = requests.post(url_script, json=payload)
+                            if res.status_code == 200 and "Atualizado" in res.text:
+                                st.success(f"A OS Nº {id_selecionado} foi encerrada com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error(f"Falha ao atualizar na planilha. Retorno: {res.text}")
                     else:
-                        st.warning("Informe o nome do técnico.")
+                        st.warning("Por favor, preencha o nome do Técnico antes de confirmar.")
             else:
-                st.info(f"Nenhuma OS em aberto encontrada para a unidade: {unidade_selecionada}")
+                st.info("Nenhuma OS encontrada para esta unidade.")
         else:
             st.info("Nenhuma OS aberta no sistema.")
-    else:
-        st.info("Aguardando carregamento de dados.")
 
 elif escolha == "Dashboard":
     st.header("📊 Indicadores")
@@ -192,7 +176,6 @@ elif escolha == "Dashboard":
         c1.metric("Total", len(df))
         c2.metric("Abertas", len(df[df["Status"] == "Aberta"]))
         c3.metric("Finalizadas", len(df[df["Status"] == "Finalizada"]))
-        
         st.divider()
         col_a, col_b = st.columns(2)
         with col_a:
@@ -200,5 +183,4 @@ elif escolha == "Dashboard":
             st.bar_chart(df["Unidade"].value_counts())
         with col_b:
             st.write("### Por Tipo")
-            col_tipo = "Tipo" if "Tipo" in df.columns else df.columns[4]
-            st.bar_chart(df[col_tipo].value_counts())
+            st.bar_chart(df["Tipo"].value_counts())
