@@ -14,7 +14,7 @@ def get_brasilia_time():
 
 # 2. CONFIGURAÇÃO DE URLs (LEMBRE-SE DE CHECAR SE SUA URL DO SCRIPT ESTÁ CORRETA)
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
-url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
+url_script = "https://script.google.com/macros/s/AKfycbzQ4oXcdhj6d8R1SS8g3TKckiv94R7JU1_BgKdTMUUa9r1Mb3NJ2vMlc293k26tjeE47g/exec"
 
 # 3. LEITURA DOS DADOS
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
