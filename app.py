@@ -47,7 +47,7 @@ if escolha == "Abrir OS":
     with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades_abertura)
         responsavel = st.text_input("Seu Nome")
-        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Alvenaria","Climatização","Móveis" "TI", "Outros"])
+        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria","Climatização","Móveis","TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
         
         st.write("---")
