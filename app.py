@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta, timezone
 
-# 1. CONFIGURAÇÃO DA PÁGINA (Precisa ser o primeiro comando Streamlit)
+# 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 def get_brasilia_time():
@@ -12,12 +12,15 @@ def get_brasilia_time():
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
+
+# ⚠️ COLE A SUA URL NOVA COPIADA DO PASSO 1 AQUI:
 url_script = "https://script.google.com/macros/s/AKfycbwKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
-csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
+# Tenta carregar sem especificar o nome da aba estrito (puxa a primeira por padrão do Google)
+csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv')
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
 
-# 3. VERIFICAÇÃO E LEITURA DE DADOS DIRETA (Sem travar o app)
+# 3. LEITURA DIRETA DOS DADOS
 df = pd.DataFrame()
 lista_unidades = []
 erro_conexao = None
@@ -66,12 +69,12 @@ if escolha == "Abrir OS":
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
                         if res.status_code == 200:
-                            st.success(f"OS Nº {proximo_id} registrada com sucesso!")
+                            st.success(f"OS Nº {proximo_id} registrada com sucesso! Atualize a página se necessário.")
                             st.balloons()
                         else:
-                            st.error("Erro na comunicação com a API do Google.")
+                            st.error(f"Erro na API do Google: Status {res.status_code}.")
                     except Exception as env_err:
-                        st.error(f"Falha na rede: {env_err}")
+                        st.error(f"Falha de conexão: {env_err}")
 
 # 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
@@ -91,7 +94,6 @@ elif escolha == "Ver/Encerrar OS":
             df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
             
             if not df_exibicao.empty:
-                # Corrigido o parâmetro do dataframe para evitar queda do app
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']])
                 
                 st.divider()
