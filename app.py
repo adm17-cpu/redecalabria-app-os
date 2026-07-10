@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta, timezone
 
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA (Precisa ser o primeiro comando Streamlit)
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 def get_brasilia_time():
@@ -19,7 +19,7 @@ csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:c
 
 # 3. FUNÇÕES DE LEITURA COM CACHE SEPARADO
 @st.cache_data(ttl=300)
-def obter_lista_unidades(url_unidades):
+def obtener_lista_unidades(url_unidades):
     try:
         unidades_df = pd.read_csv(url_unidades)
         if not unidades_df.empty:
@@ -33,7 +33,7 @@ def carregar_dados_os(url_dados):
     return pd.read_csv(url_dados)
 
 # Carrega a lista de unidades primeiro (super leve, acelera o boot do app)
-lista_unidades = obter_lista_unidades(csv_url_unidades)
+lista_unidades = obtener_lista_unidades(csv_url_unidades)
 
 # 4. INTERFACE LATERAL
 st.sidebar.title("Rede Calábria")
@@ -66,12 +66,11 @@ if escolha == "Abrir OS":
             else:
                 agora = get_brasilia_time()
                 
-                # Só puxa o histórico se for realmente gravar para validar o ID sequencial
                 try:
                     df_temporario = carregar_dados_os(csv_url_dados)
                     proximo_id = len(df_temporario) + 1
                 except:
-                    proximo_id = 999 # Fallback de segurança
+                    proximo_id = 999
                 
                 nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
@@ -109,7 +108,8 @@ elif escolha == "Ver/Encerrar OS":
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
             
-            df_exibicao = df_abertas[df_abertas["Unidade"] == unity_sel] if unidade_sel != "Todas" else df_abertas
+            # CORRIGIDO: de unity_sel para unidade_sel
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
             
             if not df_exibicao.empty:
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
