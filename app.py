@@ -10,14 +10,14 @@ def get_brasilia_time():
     fuso_brasilia = timezone(timedelta(hours=-3))
     return datetime.now(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S")
 
-# 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
+# 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT (Seu link atualizado)
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
-url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
+url_script = "https://script.google.com/macros/s/AKfycbxKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
 
-# 3. FUNÇÃO DE LEITURA COM CACHE (Válido por 5 minutos)
+# 3. FUNÇÃO DE LEITURA COM CACHE (Otimização de Velocidade)
 @st.cache_data(ttl=300)
 def carregar_dados_planilha(url_dados, url_unidades):
     dados_df = pd.read_csv(url_dados)
@@ -42,7 +42,7 @@ st.sidebar.title("Rede Calábria")
 menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
-# Botão manual para limpar cache e buscar dados atualizados na hora
+# Botão para sincronizar manualmente os dados
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 Sincronizar Planilha"):
     st.cache_data.clear()
@@ -72,9 +72,65 @@ if escolha == "Abrir OS":
             else:
                 agora = get_brasilia_time()
                 
-                # Registra "Sem foto" de forma automática na Coluna G para manter o alinhamento das colunas
+                # Resolvido o problema de quebra de linha que gerava o SyntaxError
                 nova_linha = [len(df)+1, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
                 with st.spinner("Gravando dados..."):
                     try:
-                        res = requests.post(url_script, json={"action": "
+                        res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
+                        if res.status_code == 200:
+                            st.success(f"OS Nº {len(df)+1} registrada com sucesso!")
+                            st.cache_data.clear()
+                            st.balloons()
+                        else:
+                            st.error("Erro na comunicação com a API do Google.")
+                    except Exception as env_err:
+                        st.error(f"Falha na rede: {env_err}")
+
+# 6. MÓDULO: VER/ENCERRAR OS (Sem Imagem)
+elif escolha == "Ver/Encerrar OS":
+    st.header("📋 Ordens de Serviço Ativas")
+    
+    if df.empty:
+        st.info("Nenhum registro encontrado na planilha.")
+    else:
+        df_abertas = df[df["Status"] == "Aberta"] if "Status" in df.columns else pd.DataFrame()
+        
+        if df_abertas.empty:
+            st.info("Não existem ordens de serviço abertas.")
+        else:
+            opcoes_filtro = ["Todas"] + lista_unidades
+            unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
+            
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
+            
+            if not df_exibicao.empty:
+                st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
+                
+                st.divider()
+                st.subheader("🔍 Ações da Ordem de Serviço")
+                id_selecionado = st.selectbox("Selecione o ID da OS", df_exibicao["ID"].tolist())
+                detalhe = df_exibicao[df_exibicao["ID"] == id_selecionado].iloc[0]
+                
+                st.markdown(f"**Responsável Atual:** {detalhe['Responsavel']}")
+                st.markdown(f"**Tipo:** {detalhe['Tipo']}")
+                st.markdown(f"**Descrição:** {detalhe['Descricao']}")
+                
+                st.divider()
+                tecnico = st.text_input("Técnico Responsável")
+                
+                if st.button("Confirmar Encerramento da OS"):
+                    if tecnico:
+                        payload = {
+                            "action": "update", 
+                            "id": str(id_selecionado), 
+                            "status": "Finalizada", 
+                            "tecnico": tecnico, 
+                            "data_fim": get_brasilia_time()
+                        }
+                        with st.spinner("Atualizando base de dados..."):
+                            try:
+                                res = requests.post(url_script, json=payload, timeout=15)
+                                if res.status_code == 200 and "Atualizado" in res.text:
+                                    st.success(f"OS {id_selecionado} encerrada com sucesso!")
+                                    st.cache_data.clear()
