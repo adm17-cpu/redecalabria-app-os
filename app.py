@@ -12,12 +12,14 @@ def get_brasilia_time():
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
+
+# ⚠️ SUBSTITUA O LINK ABAIXO PELA URL QUE COPIOU NO PASSO 1 SE FOR DIFERENTE:
 url_script = "https://script.google.com/macros/s/AKfycbwKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
 
-# 3. LEITURA COMPLETA DOS DADOS (Sem Cache para Teste de Gravação Direta)
+# 3. LEITURA COMPLETA DOS DADOS
 df = pd.DataFrame()
 lista_unidades = []
 erro_conexao = None
@@ -60,6 +62,7 @@ if escolha == "Abrir OS":
                 agora = get_brasilia_time()
                 proximo_id = len(df) + 1 if not df.empty else 1
                 
+                # Envia exatamente 8 colunas correspondentes à tabela do Sheets
                 nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
                 with st.spinner("Gravando dados na planilha..."):
@@ -69,9 +72,9 @@ if escolha == "Abrir OS":
                             st.success(f"OS Nº {proximo_id} registrada com sucesso!")
                             st.balloons()
                         else:
-                            st.error(f"Erro do servidor Google: status {res.status_code}. Verifique as permissões do script.")
+                            st.error(f"Erro do servidor Google: status {res.status_code}. Verifique o link url_script.")
                     except Exception as env_err:
-                        st.error(f"Falha de rede ao tentar alcançar o Google: {env_err}")
+                        st.error(f"Falha de rede ao conectar com o Google: {env_err}")
 
 # 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
