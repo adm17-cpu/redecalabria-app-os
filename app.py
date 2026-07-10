@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta, timezone
 
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA (Precisa ser o primeiro comando Streamlit)
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 def get_brasilia_time():
@@ -12,14 +12,12 @@ def get_brasilia_time():
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
-
-# ⚠️ SUBSTITUA O LINK ABAIXO PELA URL QUE COPIOU NO PASSO 1 SE FOR DIFERENTE:
 url_script = "https://script.google.com/macros/s/AKfycbwKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
 
-# 3. LEITURA COMPLETA DOS DADOS
+# 3. VERIFICAÇÃO E LEITURA DE DADOS DIRETA (Sem travar o app)
 df = pd.DataFrame()
 lista_unidades = []
 erro_conexao = None
@@ -62,19 +60,18 @@ if escolha == "Abrir OS":
                 agora = get_brasilia_time()
                 proximo_id = len(df) + 1 if not df.empty else 1
                 
-                # Envia exatamente 8 colunas correspondentes à tabela do Sheets
                 nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
-                with st.spinner("Gravando dados na planilha..."):
+                with st.spinner("Gravando dados..."):
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
                         if res.status_code == 200:
                             st.success(f"OS Nº {proximo_id} registrada com sucesso!")
                             st.balloons()
                         else:
-                            st.error(f"Erro do servidor Google: status {res.status_code}. Verifique o link url_script.")
+                            st.error("Erro na comunicação com a API do Google.")
                     except Exception as env_err:
-                        st.error(f"Falha de rede ao conectar com o Google: {env_err}")
+                        st.error(f"Falha na rede: {env_err}")
 
 # 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
@@ -94,7 +91,8 @@ elif escolha == "Ver/Encerrar OS":
             df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
             
             if not df_exibicao.empty:
-                st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
+                # Corrigido o parâmetro do dataframe para evitar queda do app
+                st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']])
                 
                 st.divider()
                 st.subheader("🔍 Ações da Ordem de Serviço")
