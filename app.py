@@ -4,7 +4,7 @@ import requests
 import base64
 from datetime import datetime, timedelta, timezone
 
-# 1. CONFIGURAÇÃO DA PÁGINA (Instrução obrigatória no topo)
+# 1. CONFIGURAÇÃO DA PÁGINA (Precisa ser o primeiro comando Streamlit)
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 def get_brasilia_time():
@@ -15,7 +15,6 @@ def get_brasilia_time():
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
 url_script = "https://script.google.com/macros/s/AKfycbwKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
-# Conversion format for CSV streaming
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
 
@@ -93,7 +92,6 @@ elif escolha == "Ver/Encerrar OS":
     if df.empty:
         st.info("Nenhum registro encontrado na planilha.")
     else:
-        # Garante a existência da coluna de controle de status
         df_abertas = df[df["Status"] == "Aberta"] if "Status" in df.columns else pd.DataFrame()
         
         if df_abertas.empty:
@@ -102,7 +100,8 @@ elif escolha == "Ver/Encerrar OS":
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
             
-            df_exibicao = df_abertas[df_abertas["Unidade"] == unity_sel] if unidade_sel != "Todas" else df_abertas
+            # CORREÇÃO DA VARIÁVEL AQUI (unidade_sel)
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
             
             if not df_exibicao.empty:
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
@@ -119,7 +118,6 @@ elif escolha == "Ver/Encerrar OS":
                 if "data:image" in str(detalhe.get('Foto_URL', '')):
                     st.image(detalhe['Foto_URL'], caption=f"Foto Anexa OS {id_selecionado}", width=500)
                 
-                # ENCERRAMENTO DIRETO
                 st.divider()
                 tecnico = st.text_input("Técnico Responsável")
                 
