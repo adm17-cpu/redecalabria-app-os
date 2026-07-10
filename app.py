@@ -10,7 +10,7 @@ def get_brasilia_time():
     fuso_brasilia = timezone(timedelta(hours=-3))
     return datetime.now(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S")
 
-# 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT (Seu link atualizado)
+# 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
 url_script = "https://script.google.com/macros/s/AKfycbxKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
@@ -72,7 +72,6 @@ if escolha == "Abrir OS":
             else:
                 agora = get_brasilia_time()
                 
-                # Resolvido o problema de quebra de linha que gerava o SyntaxError
                 nova_linha = [len(df)+1, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
                 with st.spinner("Gravando dados..."):
@@ -134,3 +133,21 @@ elif escolha == "Ver/Encerrar OS":
                                 if res.status_code == 200 and "Atualizado" in res.text:
                                     st.success(f"OS {id_selecionado} encerrada com sucesso!")
                                     st.cache_data.clear()
+                                    st.rerun()
+                                else:
+                                    st.error(f"Erro ao processar: {res.text}")
+                            except Exception as err:
+                                st.error(f"Erro na conexão: {err}")
+                    else:
+                        st.warning("Insira o nome do técnico responsável.")
+            else:
+                st.info("Nenhuma OS aberta para a unidade selecionada.")
+
+# 7. MÓDULO: DASHBOARD
+elif escolha == "Dashboard":
+    st.header("📊 Indicadores Gerais")
+    if not df.empty and "Status" in df.columns:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Registrado", len(df))
+        c2.metric("Pendentes (Abertas)", len(df[df["Status"] == "Aberta"]))
+        c3.metric("Concluídas", len(df[df["Status"] == "Finalizada"]))
