@@ -45,7 +45,7 @@ if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     opcoes_unidades = ["Selecione uma Unidade..."] + lista_unidades
     
-    # IMPORTANTE: Desativei o clear_on_submit temporariamente para capturarmos o erro sem a tela resetar!
+    # clear_on_submit=False para capturar o erro em tempo real sem limpar os campos
     with st.form("form_os", clear_on_submit=False):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades)
         responsavel = st.text_input("Seu Nome")
@@ -69,17 +69,17 @@ if escolha == "Abrir OS":
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
                         
-                        # Mostra exatamente o status retornado e o texto cru do Google
+                        # Exibe exatamente os códigos de rastreamento no ecrã para auditoria
                         st.info(f"Código de Resposta do Google: {res.status_code}")
                         st.info(f"Texto Retornado do Google: '{res.text}'")
                         
                         if res.status_code == 200 and "Sucesso" in res.text:
-                            st.success(f"OS Nº {proximo_id} gravada!")
+                            st.success(f"OS Nº {proximo_id} gravada com sucesso!")
                             st.balloons()
                         else:
-                            st.warning("O Google respondeu, mas não com o texto esperado de sucesso.")
+                            st.warning("O Google recebeu a requisição, mas não respondeu com a confirmação esperada.")
                     except Exception as env_err:
-                        st.error(f"🚨 O Streamlit não conseguiu alcançar o link do Google: {env_err}")
+                        st.error(f"🚨 Não foi possível alcançar o link do Google: {env_err}")
 
 # 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
@@ -93,7 +93,12 @@ elif escolha == "Ver/Encerrar OS":
         else:
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
-            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unity_sel != "Todas" if 'unity_sel' in locals() else df_abertas else df_abertas
+            
+            # LINHA 96 CORRIGIDA: Filtro de tabela limpo e sem erros de sintaxe
+            if unidade_sel != "Todas":
+                df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel]
+            else:
+                df_exibicao = df_abertas
             
             if not df_exibicao.empty:
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']])
