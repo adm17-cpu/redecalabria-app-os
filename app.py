@@ -13,8 +13,8 @@ def get_brasilia_time():
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
 
-# ⚠️ COLE A SUA ÚLTIMA URL DO SCRIPT AQUI DENTRO DAS ASPAS:
-url_script = "https://script.google.com/macros/s/AKfycbwKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
+# ⚠️ LINK ATUALIZADO BASEADO NO SEU ID ATIVO:
+url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
 
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv')
 csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
@@ -38,14 +38,15 @@ menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
 if erro_conexao:
-    st.sidebar.error(f"⚠️ Erro ao carregar dados: {erro_conexao}")
+    st.sidebar.error(f"⚠️ Erro ao carregar dados da Planilha: {erro_conexao}")
 
 # 5. MÓDULO: ABRIR OS
 if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     opcoes_unidades = ["Selecione uma Unidade..."] + lista_unidades
     
-    with st.form("form_os", clear_on_submit=True):
+    # IMPORTANTE: Desativei o clear_on_submit temporariamente para capturarmos o erro sem a tela resetar!
+    with st.form("form_os", clear_on_submit=False):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades)
         responsavel = st.text_input("Seu Nome")
         tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria", "Climatização", "Móveis", "TI", "Outros"])
@@ -64,75 +65,38 @@ if escolha == "Abrir OS":
                 
                 nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
-                with st.spinner("Gravando dados..."):
+                with st.spinner("Enviando dados para o Google..."):
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
                         
-                        # VALIDAÇÃO EXIGENTE: Verifica se o script retornou exatamente "Sucesso"
-                        if res.status_code == 200 and res.text == "Sucesso":
-                            st.success(f"OS Nº {proximo_id} registrada com sucesso na planilha!")
+                        # Mostra exatamente o status retornado e o texto cru do Google
+                        st.info(f"Código de Resposta do Google: {res.status_code}")
+                        st.info(f"Texto Retornado do Google: '{res.text}'")
+                        
+                        if res.status_code == 200 and "Sucesso" in res.text:
+                            st.success(f"OS Nº {proximo_id} gravada!")
                             st.balloons()
                         else:
-                            # Se der erro interno na planilha, o Google avisa aqui:
-                            st.error(f"O Google recusou o salvamento. Resposta: {res.text}")
+                            st.warning("O Google respondeu, mas não com o texto esperado de sucesso.")
                     except Exception as env_err:
-                        st.error(f"Falha de conexão com a rede: {env_err}")
+                        st.error(f"🚨 O Streamlit não conseguiu alcançar o link do Google: {env_err}")
 
 # 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
-    
     if df.empty:
         st.info("Nenhum registro encontrado na planilha.")
     else:
         df_abertas = df[df["Status"] == "Aberta"] if "Status" in df.columns else pd.DataFrame()
-        
         if df_abertas.empty:
             st.info("Não existem ordens de serviço abertas.")
         else:
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
-            
-            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unity_sel != "Todas" if 'unity_sel' in locals() else df_abertas else df_abertas
             
             if not df_exibicao.empty:
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']])
-                
-                st.divider()
-                st.subheader("🔍 Ações da Ordem de Serviço")
-                id_selecionado = st.selectbox("Selecione o ID da OS", df_exibicao["ID"].tolist())
-                detalhe = df_exibicao[df_exibicao["ID"] == id_selecionado].iloc[0]
-                
-                st.markdown(f"**Responsável Atual:** {detalhe['Responsavel']}")
-                st.markdown(f"**Tipo:** {detalhe['Tipo']}")
-                st.markdown(f"**Descrição:** {detalhe['Descricao']}")
-                
-                st.divider()
-                tecnico = st.text_input("Técnico Responsável")
-                
-                if st.button("Confirmar Encerramento da OS"):
-                    if tecnico:
-                        payload = {
-                            "action": "update", 
-                            "id": str(id_selecionado), 
-                            "status": "Finalizada", 
-                            "tecnico": tecnico, 
-                            "data_fim": get_brasilia_time()
-                        }
-                        with st.spinner("Atualizando base de dados..."):
-                            try:
-                                res = requests.post(url_script, json=payload, timeout=15)
-                                if res.status_code == 200 and "Atualizado" in res.text:
-                                    st.success(f"OS {id_selecionado} encerrada com sucesso!")
-                                    st.rerun()
-                                else:
-                                    st.error(f"Erro ao processar: {res.text}")
-                            except Exception as err:
-                                st.error(f"Erro na conexão: {err}")
-                    else:
-                        st.warning("Insira o nome do técnico responsável.")
-            else:
-                st.info("Nenhuma OS aberta para a unidade selecionada.")
 
 # 7. MÓDULO: DASHBOARD
 elif escolha == "Dashboard":
