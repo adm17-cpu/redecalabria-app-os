@@ -1,20 +1,20 @@
 import streamlit as st
 import pandas as pd
 import requests
-import pytz
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 def get_brasilia_time():
-    fuso = pytz.timezone('America/Sao_Paulo')
-    return datetime.now(fuso).strftime("%d/%m/%Y %H:%M:%S")
+    # Calcula o fuso horário de Brasília (UTC-3) de forma 100% nativa (sem pytz)
+    fuso_brasilia = timezone(timedelta(hours=-3))
+    return datetime.now(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S")
 
 # 2. CONFIGURAÇÃO DE URLs (LEMBRE-SE DE CHECAR SE SUA URL DO SCRIPT ESTÁ CORRETA)
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
-url_script = "https://script.google.com/macros/s/AKfycbzQ4oXcdhj6d8R1SS8g3TKckiv94R7JU1_BgKdTMUUa9r1Mb3NJ2vMlc293k26tjeE47g/exec"
+url_script = "https://script.google.com/macros/s/AKfycbxAnJNfpLIq4r5E2_Cof6McI3lidx7At-AseEMSvQzUyp5NGwRzStRczBuiWisAd366JA/exec"
 
 # 3. LEITURA DOS DADOS
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=dados')
@@ -37,7 +37,7 @@ menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
 if erro_conexao:
-    st.error(f"⚠️ Erro ao carregar dados da Planilha: {erro_conexao}")
+    st.sidebar.error(f"⚠️ Erro ao carregar dados da Planilha: {erro_conexao}")
 
 # 5. LÓGICA DO APLICATIVO
 if escolha == "Abrir OS":
@@ -47,7 +47,7 @@ if escolha == "Abrir OS":
     with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades_abertura)
         responsavel = st.text_input("Seu Nome")
-        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria","Climatização","Móveis","TI", "Outros"])
+        tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Mecânica", "Civil", "TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
         
         st.write("---")
@@ -91,8 +91,12 @@ elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     
     if not df.empty:
-        # Filtra apenas o que está Aberto baseado na sua coluna 'Status'
-        df_abertas = df[df["Status"] == "Aberta"]
+        # Verifica se a coluna 'Status' existe para evitar quebras de inicialização
+        if "Status" in df.columns:
+            df_abertas = df[df["Status"] == "Aberta"]
+        else:
+            df_abertas = pd.DataFrame()
+            st.error("Coluna 'Status' não encontrada na planilha!")
         
         if not df_abertas.empty:
             opcoes_filtro = ["Todas"] + lista_unidades
@@ -112,7 +116,7 @@ elif escolha == "Ver/Encerrar OS":
                 st.markdown(f"**Tipo de Manutenção:** {detalhe['Tipo']}")
                 st.markdown(f"**Descrição Atual:** {detalhe['Descricao']}")
                 
-                if "data:image" in str(detalhe['Foto_URL']):
+                if "data:image" in str(detalhe.get('Foto_URL', '')):
                     st.image(detalhe['Foto_URL'], caption=f"Foto da OS {id_selecionado}", width=500)
                 else:
                     st.info("Esta OS não possui foto.")
@@ -138,7 +142,7 @@ elif escolha == "Ver/Encerrar OS":
                             else:
                                 st.error("Erro ao atualizar os dados.")
 
-                # SEÇÃO DE ENCERRAMENTO DA OS (CORRIGIDA)
+                # SEÇÃO DE ENCERRAMENTO DA OS
                 st.divider()
                 st.subheader("🔒 Encerrar esta OS")
                 tecnico = st.text_input("Técnico Responsável pelo fechamento")
@@ -171,16 +175,18 @@ elif escolha == "Ver/Encerrar OS":
 
 elif escolha == "Dashboard":
     st.header("📊 Indicadores")
-    if not df.empty:
+    if not df.empty and "Status" in df.columns:
         c1, c2, c3 = st.columns(3)
         c1.metric("Total", len(df))
         c2.metric("Abertas", len(df[df["Status"] == "Aberta"]))
         c3.metric("Finalizadas", len(df[df["Status"] == "Finalizada"]))
         st.divider()
         col_a, col_b = st.columns(2)
-        with col_a:
-            st.write("### Por Unidade")
-            st.bar_chart(df["Unidade"].value_counts())
-        with col_b:
-            st.write("### Por Tipo")
-            st.bar_chart(df["Tipo"].value_counts())
+        if "Unidade" in df.columns:
+            with col_a:
+                st.write("### Por Unidade")
+                st.bar_chart(df["Unidade"].value_counts())
+        if "Tipo" in df.columns:
+            with col_b:
+                st.write("### Por Tipo")
+                st.bar_chart(df["Tipo"].value_counts())
