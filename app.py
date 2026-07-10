@@ -12,6 +12,8 @@ def get_brasilia_time():
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
+
+# ⚠️ COLE A SUA ÚLTIMA URL DO SCRIPT AQUI DENTRO DAS ASPAS:
 url_script = "https://script.google.com/macros/s/AKfycbwKpC_06a_dfR8NH-5Hi9v1sBbhRBjXKY6M8qdiQvIPvFAF7By59RAU6yNWvlArv1w5-w/exec"
 
 csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv')
@@ -66,13 +68,13 @@ if escolha == "Abrir OS":
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
                         
-                        # VALIDAÇÃO RIGOROSA: Só aceita se o Google responder exatamente "Sucesso"
+                        # VALIDAÇÃO EXIGENTE: Verifica se o script retornou exatamente "Sucesso"
                         if res.status_code == 200 and res.text == "Sucesso":
                             st.success(f"OS Nº {proximo_id} registrada com sucesso na planilha!")
                             st.balloons()
                         else:
-                            # Se o Google rejeitar, o Streamlit vai cuspir o erro real na tela aqui:
-                            st.error(f"O Google recusou o salvamento. Resposta do Servidor: {res.text}")
+                            # Se der erro interno na planilha, o Google avisa aqui:
+                            st.error(f"O Google recusou o salvamento. Resposta: {res.text}")
                     except Exception as env_err:
                         st.error(f"Falha de conexão com a rede: {env_err}")
 
@@ -91,7 +93,7 @@ elif escolha == "Ver/Encerrar OS":
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
             
-            df_exibicao = df_abertas[df_abertas["Unidade"] == unity_sel] if 'unity_sel' in locals() else df_abertas
+            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel] if unidade_sel != "Todas" else df_abertas
             
             if not df_exibicao.empty:
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']])
