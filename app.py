@@ -12,7 +12,7 @@ def get_brasilia_time():
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
-url_script = "https://script.google.com/a/macros/calabria.com.br/s/AKfycbyFSV__GrejqOR5RdYly06yCzPtC-x5KYVcs8Opzjrz_pyLEI_glnh-00sYENlmfa_r/exec"
+url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
 # Geração das URLs de exportação CSV
 csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv"
