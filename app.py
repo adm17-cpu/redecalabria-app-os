@@ -15,11 +15,11 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
-# Endereços em formato TSV para leitura nativa ultra-rápida e sem consumo de RAM
+# Endereços em formato leve para o Google Sheets
 tsv_url_dados = f"{url_base}/gviz/tq?tqx=out:tsv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'"
 tsv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
-# 3. FUNÇÃO AUXILIAR DE REQUISIÇÃO (Substitui o pandas.read_csv)
+# 3. FUNÇÃO AUXILIAR DE REQUISIÇÃO (Ultra-leve)
 def ler_url_linhas(url, usar_tsv=False):
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -31,19 +31,18 @@ def ler_url_linhas(url, usar_tsv=False):
             separador = '\t' if usar_tsv else ','
             linhas_processadas = []
             
-            # Divide os campos respeitando as aspas se houver
             for i, linha in enumerate(conteudo):
-                if i == 0:  # Ignora cabeçalhos
+                if i == 0:  # Ignora a linha de cabeçalhos
                     continue
                 partes = linha.split(separador)
                 partes_limpas = [p.strip('"') for p in partes]
                 if partes_limpas and partes_limpas[0]:
                     linhas_processadas.append(partes_limpas)
-            return lines_processadas
+            return linhas_processadas
     except:
         return []
 
-# Carrega os dados leves sob demanda
+# Carrega a lista de unidades para os formulários
 lista_linhas_unidades = ler_url_linhas(tsv_url_unidades, usar_tsv=False)
 lista_unidades = [l[0] for l in lista_linhas_unidades if l]
 
@@ -80,7 +79,7 @@ if escolha == "Abrir OS":
                         with urllib.request.urlopen(req, timeout=10) as res:
                             resposta_texto = res.read().decode('utf-8')
                         if "Sucesso" in resposta_texto:
-                            st.success("OS gravada com sucesso!")
+                            st.success("OS gravada com sucesso! Atualize a página para atualizar.")
                         else:
                             st.error(f"Erro no servidor: {resposta_texto}")
                     except Exception as env_err:
@@ -90,8 +89,8 @@ if escolha == "Abrir OS":
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     
-    # Carrega chamados abertos diretamente via TSV leve
-    chamados_abertos = ler_url_linhas(csv_url_dados_leves, usar_tsv=True)
+    # CORRIGIDO: Agora usando o nome correto da variável (tsv_url_dados)
+    chamados_abertos = ler_url_linhas(tsv_url_dados, usar_tsv=True)
     
     if not chamados_abertos:
         st.info("Não existem ordens de serviço abertas no momento.")
@@ -99,7 +98,6 @@ elif escolha == "Ver/Encerrar OS":
         opcoes_filtro = ["Todas"] + lista_unidades
         unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
         
-        # Filtra os dados de maneira nativa na memória
         exibicao = []
         for c in chamados_abertos:
             if len(c) >= 6:
@@ -110,42 +108,6 @@ elif escolha == "Ver/Encerrar OS":
                     })
         
         if exibicao:
-            st.table(exibicao)  # Renderização em tabela estática nativa (Consome pouquíssima memória)
+            st.table(exibicao)
             
             st.write("---")
-            st.subheader("🛠️ Encerrar Ordem de Serviço")
-            
-            lista_ids = [int(c["ID"]) for c in exibicao if c["ID"].isdigit()]
-            
-            with st.form("form_Camp_encerra", clear_on_submit=True):
-                os_selecionada = st.selectbox("Selecione a ID da OS que deseja fechar", lista_ids)
-                tecnico = st.text_input("Nome do Técnico / Responsável pela Execução")
-                botao_encerrar = st.form_submit_button("Concluir e Encerrar OS")
-                
-                if botao_encerrar:
-                    if not tecnico:
-                        st.error("Por favor, digite o nome do técnico!")
-                    else:
-                        agora_fim = get_brasilia_time()
-                        dados_update = {
-                            "action": "update",
-                            "id": int(os_selecionada),
-                            "status": "Finalizada",
-                            "tecnico": tecnico,
-                            "data_fim": agora_fim
-                        }
-                        
-                        with st.spinner("Processando encerramento..."):
-                            try:
-                                payload = json.dumps(dados_update).encode('utf-8')
-                                req = urllib.request.Request(url_script, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                                with urllib.request.urlopen(req, timeout=12) as res:
-                                    resposta_texto = res.read().decode('utf-8')
-                                if "Atualizado" in resposta_texto:
-                                    st.success(f"OS Nº {os_selecionada} encerrada com sucesso! Atualize a página para atualizar a lista.")
-                                else:
-                                    st.error(f"Erro na folha: {resposta_texto}")
-                            except Exception as err:
-                                st.error(f"Erro de timeout: {err}")
-        else:
-            st.info("Nenhuma OS aberta registrada para esta unidade específica.")
