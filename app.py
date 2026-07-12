@@ -16,11 +16,12 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
-# URLs oficiais em formato CSV leve (filtrando apenas as abertas direto na origem)
+# URLs oficiais em formato CSV leve (trazemos a coluna A de todas para saber o último ID sem gastar memória)
+csv_url_todos_ids = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A"
 csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
-# 3. LEITOR DE CSV NATIVO (Ultra-leve e imune a erros de quebra de texto)
+# 3. LEITOR DE CSV NATIVO (Ultra-leve)
 def ler_dados_csv(url):
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -32,9 +33,8 @@ def ler_dados_csv(url):
             leitor = csv.reader(linhas_cruas)
             resultado = list(leitor)
             
-            # Remove a linha de cabeçalho, se existir
             if resultado:
-                resultado.pop(0)
+                resultado.pop(0)  # Remove cabeçalho
             return resultado
     except Exception as e:
         return []
@@ -66,10 +66,24 @@ if escolha == "Abrir OS":
             elif not responsavel or not descricao:
                 st.error("Preencha o Nome e a Descrição!")
             else:
-                agora = get_brasilia_time()
-                nova_linha = [0, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
-                
-                with st.spinner("Enviando chamado..."):
+                with st.spinner("Calculando próximo ID e enviando chamado..."):
+                    # Descobre qual é o maior ID existente na planilha de forma super leve
+                    linhas_ids = ler_dados_csv(csv_url_todos_ids)
+                    maior_id = 166  # Valor base de segurança caso falhe a leitura
+                    
+                    if linhas_ids:
+                        for item in linhas_ids:
+                            if item and str(item[0]).isdigit():
+                                valor_id = int(item[0])
+                                if valor_id > maior_id:
+                                    maior_id = valor_id
+                    
+                    proximo_id = maior_id + 1
+                    agora = get_brasilia_time()
+                    
+                    # GRAVAÇÃO: Agora envia o ID correto calculado (ex: 167)
+                    nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
+                    
                     try:
                         payload = json.dumps({"action": "add", "row": nova_linha}).encode('utf-8')
                         req = urllib.request.Request(url_script, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
@@ -77,7 +91,7 @@ if escolha == "Abrir OS":
                             resposta_texto = res.read().decode('utf-8')
                         
                         if "Sucesso" in resposta_texto:
-                            st.success("OS gravada com sucesso! Alterne o menu para atualizar a lista.")
+                            st.success(f"OS Nº {proximo_id} gravada com sucesso! Alterne o menu para atualizar a lista.")
                         else:
                             st.error(f"Erro no servidor: {resposta_texto}")
                     except Exception as env_err:
@@ -87,7 +101,6 @@ if escolha == "Abrir OS":
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     
-    # Carrega os chamados abertos usando o leitor robusto de CSV
     chamados_abertos = ler_dados_csv(csv_url_dados)
     
     opcoes_filtro = ["Todas"] + lista_unidades
