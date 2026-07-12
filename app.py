@@ -14,7 +14,7 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbxCeSZ_t1Uwpn-jCeJkdExSNAOP7eO3DkKrtZYPUHvEDSFwdg6EjX0epaJG3W518mhT/exec"
 
-# CORREÇÃO CRÍTICA: Garante a conversão correta para exportar como CSV sem depender do final do link
+# Geração correta dos links CSV
 csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
@@ -44,7 +44,6 @@ if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     opcoes_unidades = ["Selecione uma Unidade..."] + lista_unidades
     
-    # clear_on_submit mudado para True para limpar os campos após sucesso
     with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades)
         responsavel = st.text_input("Seu Nome")
@@ -89,6 +88,7 @@ elif escolha == "Ver/Encerrar OS":
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
             
+            # CORREÇÃO DA LINHA 95: Filtragem simples e sem condições quebradas
             if unidade_sel != "Todas":
                 df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel]
             else:
