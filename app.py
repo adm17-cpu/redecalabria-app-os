@@ -17,19 +17,21 @@ url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3
 csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
-# 3. FUNÇÕES COM CACHE INTELIGENTE (Evita estouro de memória)
-@st.cache_data(ttl=10)  # Guarda os dados por 10 segundos, evitando baixar a planilha a cada clique
-def carregar_dados():
+# 3. GERENCIAMENTO DE ESTADO E LEITURA LEVE
+if 'dados_df' not in st.session_state or st.sidebar.button("🔄 Atualizar Dados"):
     try:
-        dados = pd.read_csv(csv_url_dados)
-        unidades = pd.read_csv(csv_url_unidades)
-        lista = unidades.iloc[:, 0].dropna().unique().tolist() if not unidades.empty else []
-        return dados, lista, None
+        st.session_state.dados_df = pd.read_csv(csv_url_dados)
+        df_unidades = pd.read_csv(csv_url_unidades)
+        st.session_state.lista_unidades = df_unidades.iloc[:, 0].dropna().unique().tolist() if not df_unidades.empty else []
+        st.session_state.erro_conexao = None
     except Exception as e:
-        return pd.DataFrame(), [], str(e)
+        st.session_state.dados_df = pd.DataFrame()
+        st.session_state.lista_unidades = []
+        st.session_state.erro_conexao = str(e)
 
-# Carrega os dados usando a estrutura de cache otimizada
-df, lista_unidades, erro_conexao = carregar_dados()
+df = st.session_state.dados_df
+lista_unidades = st.session_state.lista_unidades
+erro_conexao = st.session_state.erro_conexao
 
 # 4. INTERFACE LATERAL
 st.sidebar.title("Rede Calábria")
@@ -37,7 +39,7 @@ menu = ["Abrir OS", "Ver/Encerrar OS", "Dashboard"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
 if erro_conexao:
-    st.sidebar.error(f"⚠️ Erro ao carregar dados da Planilha: {erro_conexao}")
+    st.sidebar.error(f"⚠️ Erro ao carregar dados: {erro_conexao}")
 
 # 5. MÓDULO: ABRIR OS
 if escolha == "Abrir OS":
@@ -49,7 +51,6 @@ if escolha == "Abrir OS":
         responsavel = st.text_input("Seu Nome")
         tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria", "Climatização", "Móveis", "TI", "Outros"])
         descricao = st.text_area("Descrição do problema")
-        
         submetido = st.form_submit_button("Enviar Ordem de Serviço")
         
         if submetido:
@@ -60,27 +61,23 @@ if escolha == "Abrir OS":
             else:
                 agora = get_brasilia_time()
                 proximo_id = len(df) + 1 if not df.empty else 1
-                
                 nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
-                with st.spinner("Enviando dados para o Google..."):
+                with st.spinner("Gravando..."):
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
-                        
                         if res.status_code == 200 and "Sucesso" in res.text:
-                            st.success(f"OS Nº {proximo_id} gravada com sucesso!")
-                            st.cache_data.clear()  # Limpa o cache para forçar a leitura do dado novo na próxima transição
-                            st.balloons()
+                            st.success(f"OS Nº {proximo_id} enviada! Clique em 'Atualizar Dados' na lateral para sincronizar.")
                         else:
-                            st.error(f"O Google recusou o salvamento. Resposta: {res.text}")
+                            st.error(f"Erro: {res.text}")
                     except Exception as env_err:
-                        st.error(f"🚨 Não foi possível alcançar o link do Google: {env_err}")
+                        st.error(f"🚨 Conexão falhou: {env_err}")
 
 # 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     if df.empty:
-        st.info("Nenhum registro encontrado na planilha.")
+        st.info("Nenhum registro ativo.")
     else:
         df_abertas = df[df["Status"].str.strip().str.lower() == "aberta"] if "Status" in df.columns else pd.DataFrame()
         
@@ -100,7 +97,6 @@ elif escolha == "Ver/Encerrar OS":
                 
                 st.write("---")
                 st.subheader("🛠️ Encerrar Ordem de Serviço")
-                
                 lista_ids = df_exibicao['ID'].tolist()
                 
                 with st.form("form_Camp_encerra", clear_on_submit=True):
@@ -110,7 +106,7 @@ elif escolha == "Ver/Encerrar OS":
                     
                     if botao_encerrar:
                         if not tecnico:
-                            st.error("Por favor, digite o nome do responsável técnico pelo atendimento!")
+                            st.error("Digite o nome do responsável técnico!")
                         else:
                             agora_fim = get_brasilia_time()
                             dados_update = {
@@ -121,19 +117,17 @@ elif escolha == "Ver/Encerrar OS":
                                 "data_fim": agora_fim
                             }
                             
-                            with st.spinner("Atualizando status no Google Sheets..."):
+                            with st.spinner("Encerrando..."):
                                 try:
                                     res = requests.post(url_script, json=dados_update, timeout=15)
                                     if res.status_code == 200 and "Atualizado" in res.text:
-                                        st.success(f"OS Nº {os_selecionada} encerrada com sucesso!")
-                                        st.cache_data.clear()  # Limpa o cache para recarregar a tabela atualizada
-                                        st.balloons()
+                                        st.success(f"OS Nº {os_selecionada} finalizada com sucesso! Se quiser atualizar a tabela agora, use o botão 'Atualizar Dados' à esquerda.")
                                     else:
-                                        st.error(f"Erro na resposta do Google Apps Script: {res.text}")
+                                        st.error(f"Resposta Google: {res.text}")
                                 except Exception as err:
-                                    st.error(f"Erro ao se conectar com o servidor: {err}")
+                                    st.error(f"Erro: {err}")
             else:
-                st.info("Nenhuma OS aberta cadastrada para esta unidade específica.")
+                st.info("Nenhuma OS aberta para esta unidade.")
 
 # 7. MÓDULO: DASHBOARD
 elif escolha == "Dashboard":
