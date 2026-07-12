@@ -11,13 +11,12 @@ def get_brasilia_time():
     return datetime.now(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S")
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
-url_planilha = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc/edit?pli=1&gid=0#gid=0"
-
-# ⚠️ LINK ATUALIZADO BASEADO NO SEU ID ATIVO:
+url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbxCeSZ_t1Uwpn-jCeJkdExSNAOP7eO3DkKrtZYPUHvEDSFwdg6EjX0epaJG3W518mhT/exec"
 
-csv_url_dados = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv')
-csv_url_unidades = url_planilha.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=Unidades')
+# CORREÇÃO CRÍTICA: Garante a conversão correta para exportar como CSV sem depender do final do link
+csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv"
+csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
 # 3. LEITURA DIRETA DOS DADOS
 df = pd.DataFrame()
@@ -45,8 +44,8 @@ if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     opcoes_unidades = ["Selecione uma Unidade..."] + lista_unidades
     
-    # clear_on_submit=False para capturar o erro em tempo real sem limpar os campos
-    with st.form("form_os", clear_on_submit=False):
+    # clear_on_submit mudado para True para limpar os campos após sucesso
+    with st.form("form_os", clear_on_submit=True):
         unidade = st.selectbox("Selecione a Unidade", opcoes_unidades)
         responsavel = st.text_input("Seu Nome")
         tipo = st.selectbox("Tipo de Manutenção", ["Elétrica", "Hidráulica", "Alvenaria", "Climatização", "Móveis", "TI", "Outros"])
@@ -69,15 +68,11 @@ if escolha == "Abrir OS":
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=15)
                         
-                        # Exibe exatamente os códigos de rastreamento no ecrã para auditoria
-                        st.info(f"Código de Resposta do Google: {res.status_code}")
-                        st.info(f"Texto Retornado do Google: '{res.text}'")
-                        
                         if res.status_code == 200 and "Sucesso" in res.text:
                             st.success(f"OS Nº {proximo_id} gravada com sucesso!")
                             st.balloons()
                         else:
-                            st.warning("O Google recebeu a requisição, mas não respondeu com a confirmação esperada.")
+                            st.error(f"O Google recusou o salvamento. Resposta: {res.text}")
                     except Exception as env_err:
                         st.error(f"🚨 Não foi possível alcançar o link do Google: {env_err}")
 
@@ -94,7 +89,6 @@ elif escolha == "Ver/Encerrar OS":
             opcoes_filtro = ["Todas"] + lista_unidades
             unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
             
-            # LINHA 96 CORRIGIDA: Filtro de tabela limpo e sem erros de sintaxe
             if unidade_sel != "Todas":
                 df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel]
             else:
