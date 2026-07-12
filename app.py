@@ -1,6 +1,7 @@
 import streamlit as st
-import pandas as pd
-import requests
+import json
+import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -14,28 +15,44 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
-# URLs com queries restritas para trazer o mínimo de dados possíveis
-csv_url_dados_leves = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'"
-csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
+# Endereços em formato TSV para leitura nativa ultra-rápida e sem consumo de RAM
+tsv_url_dados = f"{url_base}/gviz/tq?tqx=out:tsv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'"
+tsv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
-# 3. INTERFACE LATERAL
+# 3. FUNÇÃO AUXILIAR DE REQUISIÇÃO (Substitui o pandas.read_csv)
+def ler_url_linhas(url, usar_tsv=False):
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            conteudo = response.read().decode('utf-8').splitlines()
+            if not conteudo:
+                return []
+            
+            separador = '\t' if usar_tsv else ','
+            linhas_processadas = []
+            
+            # Divide os campos respeitando as aspas se houver
+            for i, linha in enumerate(conteudo):
+                if i == 0:  # Ignora cabeçalhos
+                    continue
+                partes = linha.split(separador)
+                partes_limpas = [p.strip('"') for p in partes]
+                if partes_limpas and partes_limpas[0]:
+                    linhas_processadas.append(partes_limpas)
+            return lines_processadas
+    except:
+        return []
+
+# Carrega os dados leves sob demanda
+lista_linhas_unidades = ler_url_linhas(tsv_url_unidades, usar_tsv=False)
+lista_unidades = [l[0] for l in lista_linhas_unidades if l]
+
+# 4. INTERFACE LATERAL
 st.sidebar.title("Rede Calábria")
 menu = ["Abrir OS", "Ver/Encerrar OS"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
-# Carregamento sob demanda direto (Não guarda lixo no session_state do servidor)
-try:
-    df_unidades = pd.read_csv(csv_url_unidades, keep_default_na=False)
-    lista_unidades = df_unidades.iloc[:, 0].dropna().unique().tolist() if not df_unidades.empty else []
-    erro_conexao = None
-except Exception as e:
-    lista_unidades = []
-    erro_conexao = str(e)
-
-if erro_conexao:
-    st.sidebar.error(f"⚠️ Erro ao conectar: {erro_conexao}")
-
-# 4. MÓDULO: ABRIR OS
+# 5. MÓDULO: ABRIR OS
 if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     opcoes_unidades = ["Selecione uma Unidade..."] + lista_unidades
@@ -56,44 +73,49 @@ if escolha == "Abrir OS":
                 agora = get_brasilia_time()
                 nova_linha = [0, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
-                with st.spinner("Enviando..."):
+                with st.spinner("Enviando chamado..."):
                     try:
-                        res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=10)
-                        if res.status_code == 200 and "Sucesso" in res.text:
+                        payload = json.dumps({"action": "add", "row": nova_linha}).encode('utf-8')
+                        req = urllib.request.Request(url_script, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                        with urllib.request.urlopen(req, timeout=10) as res:
+                            resposta_texto = res.read().decode('utf-8')
+                        if "Sucesso" in resposta_texto:
                             st.success("OS gravada com sucesso!")
                         else:
-                            st.error(f"Erro: {res.text}")
+                            st.error(f"Erro no servidor: {resposta_texto}")
                     except Exception as env_err:
-                        st.error(f"🚨 Conexão falhou: {env_err}")
+                        st.error(f"🚨 Falha de comunicação: {env_err}")
 
-# 5. MÓDULO: VER/ENCERRAR OS
+# 6. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     
-    # Faz o download apenas se o usuário entrar nesta aba (Consumo zero nas demais abas)
-    try:
-        df_abertas = pd.read_csv(csv_url_dados_leves, keep_default_na=False)
-    except:
-        df_abertas = pd.DataFrame()
-
-    if df_abertas.empty:
+    # Carrega chamados abertos diretamente via TSV leve
+    chamados_abertos = ler_url_linhas(csv_url_dados_leves, usar_tsv=True)
+    
+    if not chamados_abertos:
         st.info("Não existem ordens de serviço abertas no momento.")
     else:
         opcoes_filtro = ["Todas"] + lista_unidades
         unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
         
-        if unidade_sel != "Todas":
-            df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel]
-        else:
-            df_exibicao = df_abertas
+        # Filtra os dados de maneira nativa na memória
+        exibicao = []
+        for c in chamados_abertos:
+            if len(c) >= 6:
+                if unidade_sel == "Todas" or c[2] == unidade_sel:
+                    exibicao.append({
+                        "ID": c[0], "Data Abertura": c[1], "Unidade": c[2],
+                        "Responsável": c[3], "Tipo": c[4], "Descrição": c[5]
+                    })
         
-        if not df_exibicao.empty:
-            st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
+        if exibicao:
+            st.table(exibicao)  # Renderização em tabela estática nativa (Consome pouquíssima memória)
             
             st.write("---")
             st.subheader("🛠️ Encerrar Ordem de Serviço")
             
-            lista_ids = [int(x) for x in df_exibicao['ID'].tolist() if str(x).isdigit()]
+            lista_ids = [int(c["ID"]) for c in exibicao if c["ID"].isdigit()]
             
             with st.form("form_Camp_encerra", clear_on_submit=True):
                 os_selecionada = st.selectbox("Selecione a ID da OS que deseja fechar", lista_ids)
@@ -102,7 +124,7 @@ elif escolha == "Ver/Encerrar OS":
                 
                 if botao_encerrar:
                     if not tecnico:
-                        st.error("Digite o nome do responsável técnico!")
+                        st.error("Por favor, digite o nome do técnico!")
                     else:
                         agora_fim = get_brasilia_time()
                         dados_update = {
@@ -113,14 +135,17 @@ elif escolha == "Ver/Encerrar OS":
                             "data_fim": agora_fim
                         }
                         
-                        with st.spinner("Atualizando no Google..."):
+                        with st.spinner("Processando encerramento..."):
                             try:
-                                res = requests.post(url_script, json=dados_update, timeout=12)
-                                if res.status_code == 200 and "Atualizado" in res.text:
-                                    st.success(f"OS Nº {os_selecionada} encerrada com sucesso! A tabela será atualizada na próxima ação.")
+                                payload = json.dumps(dados_update).encode('utf-8')
+                                req = urllib.request.Request(url_script, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                                with urllib.request.urlopen(req, timeout=12) as res:
+                                    resposta_texto = res.read().decode('utf-8')
+                                if "Atualizado" in resposta_texto:
+                                    st.success(f"OS Nº {os_selecionada} encerrada com sucesso! Atualize a página para atualizar a lista.")
                                 else:
-                                    st.error(f"Erro no servidor: {res.text}")
+                                    st.error(f"Erro na folha: {resposta_texto}")
                             except Exception as err:
                                 st.error(f"Erro de timeout: {err}")
         else:
-            st.info("Nenhuma OS aberta cadastrada para esta unidade específica.")
+            st.info("Nenhuma OS aberta registrada para esta unidade específica.")
