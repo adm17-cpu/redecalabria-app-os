@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta, timezone
 
-# 1. CONFIGURAÇÃO DA PÁGINA (Sempre a primeira instrução)
+# 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Gestão de OS - Rede Calábria", layout="wide")
 
 def get_brasilia_time():
@@ -14,46 +14,28 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
-# URLs otimizadas para o menor consumo de banda e memória possíveis
+# URLs com queries restritas para trazer o mínimo de dados possíveis
 csv_url_dados_leves = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
-# 3. FUNÇÃO DE ATUALIZAÇÃO MANUAL (Sem cache persistente no servidor)
-def sincronizar_dados():
-    try:
-        # Carrega os dados leves de forma direta
-        df_temp = pd.read_csv(csv_url_dados_leves, keep_default_na=False)
-        df_uni_temp = pd.read_csv(csv_url_unidades, keep_default_na=False)
-        
-        st.session_state['dados_df'] = df_temp
-        st.session_state['lista_unidades'] = df_uni_temp.iloc[:, 0].dropna().unique().tolist() if not df_uni_temp.empty else []
-        st.session_state['erro_conexao'] = None
-    except Exception as e:
-        st.session_state['dados_df'] = pd.DataFrame(columns=['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao'])
-        st.session_state['lista_unidades'] = []
-        st.session_state['erro_conexao'] = str(e)
-
-# Inicializa o estado caso não exista
-if 'dados_df' not in st.session_state:
-    sincronizar_dados()
-
-df_abertas = st.session_state['dados_df']
-lista_unidades = st.session_state['lista_unidades']
-erro_conexao = st.session_state['erro_conexao']
-
-# 4. INTERFACE LATERAL
+# 3. INTERFACE LATERAL
 st.sidebar.title("Rede Calábria")
-if st.sidebar.button("🔄 Sincronizar Sistema", use_container_width=True):
-    sincronizar_dados()
-    st.rerun()
-
 menu = ["Abrir OS", "Ver/Encerrar OS"]
 escolha = st.sidebar.selectbox("Navegação", menu)
 
-if erro_conexao:
-    st.sidebar.error(f"⚠️ Erro de sincronização: {erro_conexao}")
+# Carregamento sob demanda direto (Não guarda lixo no session_state do servidor)
+try:
+    df_unidades = pd.read_csv(csv_url_unidades, keep_default_na=False)
+    lista_unidades = df_unidades.iloc[:, 0].dropna().unique().tolist() if not df_unidades.empty else []
+    erro_conexao = None
+except Exception as e:
+    lista_unidades = []
+    erro_conexao = str(e)
 
-# 5. MÓDULO: ABRIR OS
+if erro_conexao:
+    st.sidebar.error(f"⚠️ Erro ao conectar: {erro_conexao}")
+
+# 4. MÓDULO: ABRIR OS
 if escolha == "Abrir OS":
     st.header("📝 Abertura de Ordem de Serviço")
     opcoes_unidades = ["Selecione uma Unidade..."] + lista_unidades
@@ -74,20 +56,26 @@ if escolha == "Abrir OS":
                 agora = get_brasilia_time()
                 nova_linha = [0, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                 
-                with st.spinner("Enviando chamado..."):
+                with st.spinner("Enviando..."):
                     try:
                         res = requests.post(url_script, json={"action": "add", "row": nova_linha}, timeout=10)
                         if res.status_code == 200 and "Sucesso" in res.text:
-                            st.success("OS enviada com sucesso! Clique em 'Sincronizar Sistema' na barra lateral.")
+                            st.success("OS gravada com sucesso!")
                         else:
-                            st.error(f"Resposta do Servidor: {res.text}")
+                            st.error(f"Erro: {res.text}")
                     except Exception as env_err:
-                        st.error(f"🚨 Falha de comunicação: {env_err}")
+                        st.error(f"🚨 Conexão falhou: {env_err}")
 
-# 6. MÓDULO: VER/ENCERRAR OS
+# 5. MÓDULO: VER/ENCERRAR OS
 elif escolha == "Ver/Encerrar OS":
     st.header("📋 Ordens de Serviço Ativas")
     
+    # Faz o download apenas se o usuário entrar nesta aba (Consumo zero nas demais abas)
+    try:
+        df_abertas = pd.read_csv(csv_url_dados_leves, keep_default_na=False)
+    except:
+        df_abertas = pd.DataFrame()
+
     if df_abertas.empty:
         st.info("Não existem ordens de serviço abertas no momento.")
     else:
@@ -100,13 +88,11 @@ elif escolha == "Ver/Encerrar OS":
             df_exibicao = df_abertas
         
         if not df_exibicao.empty:
-            # Mostra apenas as colunas estritamente necessárias
             st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
             
             st.write("---")
             st.subheader("🛠️ Encerrar Ordem de Serviço")
             
-            # Converte a lista para inteiros nativos prevenindo estouros no seletor
             lista_ids = [int(x) for x in df_exibicao['ID'].tolist() if str(x).isdigit()]
             
             with st.form("form_Camp_encerra", clear_on_submit=True):
@@ -116,7 +102,7 @@ elif escolha == "Ver/Encerrar OS":
                 
                 if botao_encerrar:
                     if not tecnico:
-                        st.error("Por favor, digite o nome do técnico!")
+                        st.error("Digite o nome do responsável técnico!")
                     else:
                         agora_fim = get_brasilia_time()
                         dados_update = {
@@ -127,14 +113,14 @@ elif escolha == "Ver/Encerrar OS":
                             "data_fim": agora_fim
                         }
                         
-                        with st.spinner("A processar encerramento..."):
+                        with st.spinner("Atualizando no Google..."):
                             try:
-                                res = requests.post(url_script, json=dados_update, timeout=10)
+                                res = requests.post(url_script, json=dados_update, timeout=12)
                                 if res.status_code == 200 and "Atualizado" in res.text:
-                                    st.success(f"OS Nº {os_selecionada} encerrada! Clique em 'Sincronizar Sistema' na lateral para atualizar.")
+                                    st.success(f"OS Nº {os_selecionada} encerrada com sucesso! A tabela será atualizada na próxima ação.")
                                 else:
-                                    st.error(f"Erro na folha: {res.text}")
+                                    st.error(f"Erro no servidor: {res.text}")
                             except Exception as err:
-                                st.error(f"Erro: {err}")
+                                st.error(f"Erro de timeout: {err}")
         else:
-            st.info("Nenhuma OS aberta registada para esta unidade.")
+            st.info("Nenhuma OS aberta cadastrada para esta unidade específica.")
