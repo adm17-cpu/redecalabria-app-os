@@ -14,22 +14,22 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
-# Geração das URLs de exportação CSV
 csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
-# 3. LEITURA DIRETA DOS DADOS
-df = pd.DataFrame()
-lista_unidades = []
-erro_conexao = None
+# 3. FUNÇÕES COM CACHE INTELIGENTE (Evita estouro de memória)
+@st.cache_data(ttl=10)  # Guarda os dados por 10 segundos, evitando baixar a planilha a cada clique
+def carregar_dados():
+    try:
+        dados = pd.read_csv(csv_url_dados)
+        unidades = pd.read_csv(csv_url_unidades)
+        lista = unidades.iloc[:, 0].dropna().unique().tolist() if not unidades.empty else []
+        return dados, lista, None
+    except Exception as e:
+        return pd.DataFrame(), [], str(e)
 
-try:
-    df = pd.read_csv(csv_url_dados)
-    df_unidades = pd.read_csv(csv_url_unidades)
-    if not df_unidades.empty:
-        lista_unidades = df_unidades.iloc[:, 0].dropna().unique().tolist()
-except Exception as e:
-    erro_conexao = str(e)
+# Carrega os dados usando a estrutura de cache otimizada
+df, lista_unidades, erro_conexao = carregar_dados()
 
 # 4. INTERFACE LATERAL
 st.sidebar.title("Rede Calábria")
@@ -69,6 +69,7 @@ if escolha == "Abrir OS":
                         
                         if res.status_code == 200 and "Sucesso" in res.text:
                             st.success(f"OS Nº {proximo_id} gravada com sucesso!")
+                            st.cache_data.clear()  # Limpa o cache para forçar a leitura do dado novo na próxima transição
                             st.balloons()
                         else:
                             st.error(f"O Google recusou o salvamento. Resposta: {res.text}")
@@ -125,6 +126,7 @@ elif escolha == "Ver/Encerrar OS":
                                     res = requests.post(url_script, json=dados_update, timeout=15)
                                     if res.status_code == 200 and "Atualizado" in res.text:
                                         st.success(f"OS Nº {os_selecionada} encerrada com sucesso!")
+                                        st.cache_data.clear()  # Limpa o cache para recarregar a tabela atualizada
                                         st.balloons()
                                     else:
                                         st.error(f"Erro na resposta do Google Apps Script: {res.text}")
