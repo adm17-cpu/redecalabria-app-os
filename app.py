@@ -12,9 +12,9 @@ def get_brasilia_time():
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
-url_script = "https://script.google.com/macros/s/AKfycbxCeSZ_t1Uwpn-jCeJkdExSNAOP7eO3DkKrtZYPUHvEDSFwdg6EjX0epaJG3W518mhT/exec"
+url_script = "https://script.google.com/a/macros/calabria.com.br/s/AKfycbyFSV__GrejqOR5RdYly06yCzPtC-x5KYVcs8Opzjrz_pyLEI_glnh-00sYENlmfa_r/exec"
 
-# Geração correta dos links CSV
+# Geração das URLs de exportação CSV
 csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
@@ -73,35 +73,4 @@ if escolha == "Abrir OS":
                         else:
                             st.error(f"O Google recusou o salvamento. Resposta: {res.text}")
                     except Exception as env_err:
-                        st.error(f"🚨 Não foi possível alcançar o link do Google: {env_err}")
-
-# 6. MÓDULO: VER/ENCERRAR OS
-elif escolha == "Ver/Encerrar OS":
-    st.header("📋 Ordens de Serviço Ativas")
-    if df.empty:
-        st.info("Nenhum registro encontrado na planilha.")
-    else:
-        df_abertas = df[df["Status"] == "Aberta"] if "Status" in df.columns else pd.DataFrame()
-        if df_abertas.empty:
-            st.info("Não existem ordens de serviço abertas.")
-        else:
-            opcoes_filtro = ["Todas"] + lista_unidades
-            unidade_sel = st.selectbox("Filtrar por Unidade", opcoes_filtro)
-            
-            # CORREÇÃO DA LINHA 95: Filtragem simples e sem condições quebradas
-            if unidade_sel != "Todas":
-                df_exibicao = df_abertas[df_abertas["Unidade"] == unidade_sel]
-            else:
-                df_exibicao = df_abertas
-            
-            if not df_exibicao.empty:
-                st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']])
-
-# 7. MÓDULO: DASHBOARD
-elif escolha == "Dashboard":
-    st.header("📊 Indicadores Gerais")
-    if not df.empty and "Status" in df.columns:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Registrado", len(df))
-        c2.metric("Pendentes (Abertas)", len(df[df["Status"] == "Aberta"]))
-        c3.metric("Concluídas", len(df[df["Status"] == "Finalizada"]))
+                        st.error(f"🚨 Não foi possível alcançar o link do Google
