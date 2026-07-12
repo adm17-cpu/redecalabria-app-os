@@ -11,7 +11,7 @@ def get_brasilia_time():
     return datetime.now(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S")
 
 # 2. ENDEREÇOS DA PLANILHA E DO API SCRIPT
-url_planilha = "https://docs.google.com/spreadsheets/d/1DdK87OaWuvztkmBonUAbrPu18rNKVQ2Ytpjsq64Bxos/edit?usp=sharing"
+url_planilha = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc/edit?pli=1&gid=0#gid=0"
 
 # ⚠️ LINK ATUALIZADO BASEADO NO SEU ID ATIVO:
 url_script = "https://script.google.com/macros/s/AKfycbxCeSZ_t1Uwpn-jCeJkdExSNAOP7eO3DkKrtZYPUHvEDSFwdg6EjX0epaJG3W518mhT/exec"
