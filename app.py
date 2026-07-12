@@ -81,7 +81,6 @@ elif escolha == "Ver/Encerrar OS":
     if df.empty:
         st.info("Nenhum registro encontrado na planilha.")
     else:
-        # Garante a filtragem correta por status
         df_abertas = df[df["Status"].str.strip().str.lower() == "aberta"] if "Status" in df.columns else pd.DataFrame()
         
         if df_abertas.empty:
@@ -96,20 +95,16 @@ elif escolha == "Ver/Encerrar OS":
                 df_exibicao = df_abertas
             
             if not df_exibicao.empty:
-                # Exibe a tabela de OS Abertas
                 st.dataframe(df_exibicao[['ID', 'Data_Abertura', 'Unidade', 'Responsavel', 'Tipo', 'Descricao']], use_container_width=True)
                 
                 st.write("---")
                 st.subheader("🛠️ Encerrar Ordem de Serviço")
                 
-                # Cria uma lista com as IDs das OS exibidas para o usuário escolher
                 lista_ids = df_exibicao['ID'].tolist()
                 
-                # Formulário para realizar o encerramento
-                with st.form("form_encerramento", clear_on_submit=True):
+                with st.form("form_Camp_encerra", clear_on_submit=True):
                     os_selecionada = st.selectbox("Selecione a ID da OS que deseja fechar", lista_ids)
                     tecnico = st.text_input("Nome do Técnico / Responsável pela Execução")
-                    
                     botao_encerrar = st.form_submit_button("Concluir e Encerrar OS")
                     
                     if botao_encerrar:
@@ -131,3 +126,18 @@ elif escolha == "Ver/Encerrar OS":
                                     if res.status_code == 200 and "Atualizado" in res.text:
                                         st.success(f"OS Nº {os_selecionada} encerrada com sucesso!")
                                         st.balloons()
+                                    else:
+                                        st.error(f"Erro na resposta do Google Apps Script: {res.text}")
+                                except Exception as err:
+                                    st.error(f"Erro ao se conectar com o servidor: {err}")
+            else:
+                st.info("Nenhuma OS aberta cadastrada para esta unidade específica.")
+
+# 7. MÓDULO: DASHBOARD
+elif escolha == "Dashboard":
+    st.header("📊 Indicadores Gerais")
+    if not df.empty and "Status" in df.columns:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Registrado", len(df))
+        c2.metric("Pendentes (Abertas)", len(df[df["Status"].str.strip().str.lower() == "aberta"]))
+        c3.metric("Concluídas", len(df[df["Status"].str.strip().str.lower() == "finalizada"]))
