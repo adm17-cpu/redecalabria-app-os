@@ -16,9 +16,10 @@ def get_brasilia_time():
 url_base = "https://docs.google.com/spreadsheets/d/1pYPTKhLBiqX8JtRU1A9eC94LC5zFI0F4BpPflJsXchc"
 url_script = "https://script.google.com/macros/s/AKfycbyQj9UP5wGN20kTK7E4yI7T0C3o99MQMndf1ENn9n8mnM6J5ADlB-zeeCAbEVjTAyF3/exec"
 
-# URLs oficiais em formato CSV leve (trazemos a coluna A de todas para saber o último ID sem gastar memória)
-csv_url_todos_ids = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A"
-csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'"
+# URLs oficiais com parâmetro de data aleatório para burlar o cache do Google
+timestamp_atual = int(datetime.now().timestamp())
+csv_url_todos_ids = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A&cb={timestamp_atual}"
+csv_url_dados = f"{url_base}/gviz/tq?tqx=out:csv&tq=SELECT+A,B,C,D,E,F+WHERE+H+=+'Aberta'&cb={timestamp_atual}"
 csv_url_unidades = f"{url_base}/gviz/tq?tqx=out:csv&sheet=Unidades"
 
 # 3. LEITOR DE CSV NATIVO (Ultra-leve)
@@ -67,9 +68,8 @@ if escolha == "Abrir OS":
                 st.error("Preencha o Nome e a Descrição!")
             else:
                 with st.spinner("Calculando próximo ID e enviando chamado..."):
-                    # Descobre qual é o maior ID existente na planilha de forma super leve
                     linhas_ids = ler_dados_csv(csv_url_todos_ids)
-                    maior_id = 166  # Valor base de segurança caso falhe a leitura
+                    maior_id = 166
                     
                     if linhas_ids:
                         for item in linhas_ids:
@@ -81,7 +81,6 @@ if escolha == "Abrir OS":
                     proximo_id = maior_id + 1
                     agora = get_brasilia_time()
                     
-                    # GRAVAÇÃO: Agora envia o ID correto calculado (ex: 167)
                     nova_linha = [proximo_id, agora, unidade, responsavel, tipo, descricao, "Sem foto", "Aberta"]
                     
                     try:
@@ -91,7 +90,7 @@ if escolha == "Abrir OS":
                             resposta_texto = res.read().decode('utf-8')
                         
                         if "Sucesso" in resposta_texto:
-                            st.success(f"OS Nº {proximo_id} gravada com sucesso! Alterne o menu para atualizar a lista.")
+                            st.success(f"OS Nº {proximo_id} gravada com sucesso!")
                         else:
                             st.error(f"Erro no servidor: {resposta_texto}")
                     except Exception as env_err:
@@ -124,8 +123,18 @@ elif escolha == "Ver/Encerrar OS":
         
         lista_ids = [int(c["ID"]) for c in exibicao if str(c["ID"]).isdigit()]
         
-        with st.form("form_Camp_encerra", clear_on_submit=True):
-            os_selecionada = st.selectbox("Selecione a ID da OS que deseja fechar", lista_ids)
+        # 1. SELEÇÃO DO ID FORA DO FORMULÁRIO (Fixa a escolha do usuário na memória)
+        os_selecionada = st.selectbox(
+            "Selecione o Número da OS para fechar", 
+            options=lista_ids, 
+            key="os_fechamento_key"
+        )
+        
+        # Exibe um lembrete visual do ID selecionado para confirmação
+        st.info(f"📌 Você está prestes a encerrar a **OS Nº {os_selecionada}**")
+        
+        # 2. FORMULÁRIO APENAS PARA DADOS E ENVIO
+        with st.form("form_encerramento_seguro", clear_on_submit=True):
             tecnico = st.text_input("Nome do Técnico / Responsável pela Execução")
             botao_encerrar = st.form_submit_button("Concluir e Encerrar OS")
             
@@ -136,21 +145,22 @@ elif escolha == "Ver/Encerrar OS":
                     agora_fim = get_brasilia_time()
                     dados_update = {
                         "action": "update",
-                        "id": int(os_selecionada),
+                        "id": int(os_selecionada),  # Valor travado pela key do Streamlit
                         "status": "Finalizada",
                         "tecnico": tecnico,
                         "data_fim": agora_fim
                     }
                     
-                    with st.spinner("Processando encerramento..."):
+                    with st.spinner(f"Encerrando rigorosamente a OS Nº {os_selecionada}..."):
                         try:
                             payload = json.dumps(dados_update).encode('utf-8')
                             req = urllib.request.Request(url_script, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                            with urllib.request.urlopen(req, timeout=12) as res:
+                            with urllib.request.urlopen(req, timeout=15) as res:
                                 resposta_texto = res.read().decode('utf-8')
                             
                             if "Atualizado" in resposta_texto:
-                                st.success(f"OS Nº {os_selecionada} encerrada com sucesso! Modifique o filtro para atualizar.")
+                                st.success(f"OS Nº {os_selecionada} encerrada com sucesso!")
+                                st.rerun()
                             else:
                                 st.error(f"Erro na folha: {resposta_texto}")
                         except Exception as err:
